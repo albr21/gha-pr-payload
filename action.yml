@@ -1,0 +1,94 @@
+name: gha-pr-payload
+
+description: |-
+  GitHub Action to get Pull Request payload and optionnally check if there are
+  conflicts in the PR via the mergeable status
+
+author: albr21
+branding:
+  icon: git-pull-request
+  color: green
+
+inputs:
+  check-conflicts:
+    description: Check if there are conflicts in the PR
+    required: false
+    default: 'false'
+  comment-on-conflicts:
+    description: Comment on PR if there are conflicts
+    required: false
+    default: 'false'
+  error-message-on-conflicts:
+    description: Error message on workflow summary if there are conflicts
+    required: false
+    default: 'false'
+  exit-on-conflicts:
+    description: Exit with code 1 if there are conflicts
+    required: false
+    default: 'false'
+  command-line-interpreter:
+    description: |-
+      Command line interpreter.
+      By default, it uses `bash`, but you can change it to `sh`, `powershell`, or any other supported shell if needed.
+    required: false
+    default: bash
+
+outputs:
+  pr-payload:
+    description: Pull Request Payload
+    value: ${{ steps.get-pr-payload.outputs.output }}
+  mergeable:
+    description: Mergeable Status
+    value: ${{ steps.set-outputs.outputs.mergeable }}
+  merge-commit-sha:
+    description: Merge Commit SHA
+    value: ${{ steps.set-outputs.outputs.merge-commit-sha }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set GITHUB_ACTION_PATH variable
+      run: echo "GITHUB_ACTION_PATH=${GITHUB_ACTION_PATH}" >> $GITHUB_ENV
+      shell: ${{ inputs.command-line-interpreter }}
+
+    - name: Get PR Payload
+      id: get-pr-payload
+      uses: albr21/gha-github-script-wrapper@1.0.0
+      with:
+        script: ${{ env.GITHUB_ACTION_PATH }}/js/get-pr-payload.js
+        command-line-interpreter: ${{ inputs.command-line-interpreter }}
+
+    - name: Set outputs
+      id: set-outputs
+      run: |-
+        echo "mergeable=${{ fromJson(steps.get-pr-payload.outputs.output).mergeable }}" >> "$GITHUB_OUTPUT"
+        echo "merge-commit-sha=${{ fromJson(steps.get-pr-payload.outputs.output).merge_commit_sha }}" >> "$GITHUB_OUTPUT"
+      shell: ${{ inputs.command-line-interpreter }}
+
+    - name: Check if there are conflicts
+      if: ${{ inputs.check-conflicts == 'true' && !fromJson(steps.get-pr-payload.outputs.output).mergeable }}
+      run: |
+        if [[ ! ${{ fromJson(steps.get-pr-payload.outputs.output).mergeable }} ]]; then
+          echo "There are conflicts in the PR. Please resolve them before continuing."
+        fi
+      shell: ${{ inputs.command-line-interpreter }}
+
+    - name: Comment on PR if there are conflicts
+      if: ${{ inputs.comment-on-conflicts == 'true' && !fromJson(steps.get-pr-payload.outputs.output).mergeable }}
+      uses: albr21/gha-github-script-wrapper@1.0.0
+      with:
+        script: ${{ env.GITHUB_ACTION_PATH }}/js/comment-on-pr-conflicts.js
+        input: '{"head_ref": "${{ fromJson(steps.get-pr-payload.outputs.output).head.ref }}", "base_ref": "${{ fromJson(steps.get-pr-payload.outputs.output).base.ref }}"}'
+        command-line-interpreter: ${{ inputs.command-line-interpreter }}
+
+    - name: Error message on workflow summary if there are conflicts
+      if: ${{ inputs.error-message-on-conflicts == 'true' && !fromJson(steps.get-pr-payload.outputs.output).mergeable }}
+      run: |
+        echo "::error:: There are conflicts in the PR. Please resolve them before continuing."
+      shell: ${{ inputs.command-line-interpreter }}
+
+    - name: Exit with code 1 if there are conflicts
+      if: ${{ inputs.exit-on-conflicts == 'true' && !fromJson(steps.get-pr-payload.outputs.output).mergeable }}
+      run: |
+        exit 1
+      shell: ${{ inputs.command-line-interpreter }}
