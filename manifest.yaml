@@ -2,9 +2,10 @@ name: gha-pr-payload
 description: |-
   GitHub Action to get Pull Request payload and optionnally check if there are
   conflicts in the PR via the mergeable status
-version: 1.0.0
-changes: |-
-  [1.0.0]
-    * Initial release
-  [0.0.0]
-    * Under development
+releases:
+  - version: 1.0.0
+    changes:
+      - Initial release
+  - version: 0.0.0
+    changes:
+      - Under development
