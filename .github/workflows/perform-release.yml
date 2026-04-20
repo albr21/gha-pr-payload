@@ -1,0 +1,10 @@
+name: 🕹️ Perform GitHub Release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  release:
+    name: Release 
+    uses: albr21/gha-reusable-workflows/.github/workflows/reusable-perform-github-release.yml@main
+    secrets: inherit
